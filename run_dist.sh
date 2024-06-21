@@ -1,11 +1,25 @@
-PYTHON="/opt/conda/bin/python"
-GPU_NUM=$1
-CONFIG=$2
+#!/usr/bin/env bash
+#SBATCH --job-name=phyFea_OCRNet_training
+#SBATCH --output=/cluster/work/cvl/shbasu/phyfeaOCRNet/results/phyFea_ocr_training_output.log
+#SBATCH --error=/cluster/work/cvl/shbasu/phyfeaOCRNet/results/phyFea_ocr_training_error.log
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=shamik.basu@studio.unibo.it
+#SBATCH --gpus=rtx_3090:4
+#SBATCH --mem-per-cpu=40G
+#SBATCH --ntasks=4
+#SBATCH --time=1:00:00
 
-$PYTHON -m pip install -r requirements.txt
 
-$PYTHON -m torch.distributed.launch \
-        --nproc_per_node=$GPU_NUM \
-        tools/train.py \
-        --cfg experiments/$CONFIG.yaml \
-        2>&1 | tee local_log.txt
+GPUS=4
+PORT=$(shuf -i 15661-55661 -n 1)
+
+source /cluster/apps/local/env2lmod.sh
+module load  eth_proxy
+
+
+python -m torch.distributed.launch --nproc_per_node=$GPUS --master_port=$PORT \
+    /cluster/work/cvl/shbasu/phyfeaOCRNet/models/HRNet-Semantic-Segmentation/tools/train.py\
+   --cfg /cluster/work/cvl/shbasu/phyfeaOCRNet/models/HRNet-Semantic-Segmentation/experiments/cityscapes/seg_hrnet_ocr_w48_trainval_512x1024_sgd_lr1e-2_wd5e-4_bs_12_epoch484.yaml\
+ --seed=2022
+ --local_rank=4
+
