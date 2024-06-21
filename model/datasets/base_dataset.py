@@ -14,7 +14,7 @@ import torch
 from torch.nn import functional as F
 from torch.utils import data
 
-from lib.config import config
+from model.config import configs
 
 
 class BaseDataset(data.Dataset):

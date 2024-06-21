@@ -17,9 +17,9 @@ source /cluster/apps/local/env2lmod.sh
 module load  eth_proxy
 
 
-python -m torch.distributed.launch --nproc_per_node=$GPUS --master_port=$PORT \
-    /cluster/work/cvl/shbasu/phyfeaOCRNet/models/HRNet-Semantic-Segmentation/tools/train.py\
-   --cfg /cluster/work/cvl/shbasu/phyfeaOCRNet/models/HRNet-Semantic-Segmentation/experiments/cityscapes/seg_hrnet_ocr_w48_trainval_512x1024_sgd_lr1e-2_wd5e-4_bs_12_epoch484.yaml\
- --seed=2022
- --local_rank=4
+python -m torch.distributed.launch --nproc_per_node=$GPUS --master_port=$PORT\
+    /cluster/work/cvl/shbasu/phyfeaOCRNet/PhyFea-OCRNet/tools/train.py\
+   --cfg /cluster/work/cvl/shbasu/phyfeaOCRNet/PhyFea-OCRNet/experiments/cityscapes/seg_hrnet_ocr_w48_trainval_512x1024_sgd_lr1e-2_wd5e-4_bs_12_epoch484.yaml\
+   --seed=138
+   --local_rank=4
 

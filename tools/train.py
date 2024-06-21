@@ -17,11 +17,11 @@ import torch.nn as nn
 import torch.optim
 from tensorboardX import SummaryWriter
 
-from lib.config import config
-from lib.config import update_config
-from lib.core.criterion import CrossEntropy, OhemCrossEntropy
-from lib.core.function import train, validate
-from lib.utils.utils import create_logger, PhysicsFormer
+from model.config import configs
+from model.config import update_config
+from model.core.criterion import CrossEntropy, OhemCrossEntropy
+from model.core.function import train, validate
+from model.utils.utils import create_logger, PhysicsFormer
 
 
 def parse_args():
@@ -34,14 +34,14 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=304)
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--logits_shape", type=tuple, default=(769,769))
-    parser.add_argument("--num_classes", type=19, default=19)
+    parser.add_argument("--num_classes", type=int, default=19)
     parser.add_argument('opts',
                         help="Modify config options using the command-line",
                         default=None,
                         nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
-    update_config(config, args)
+    update_config(configs, args)
 
     return args
 
@@ -65,10 +65,10 @@ def main():
         torch.manual_seed(args.seed)
 
     logger, final_output_dir, tb_log_dir = create_logger(
-        config, args.cfg, 'train')
+        configs, args.cfg, 'train')
 
     logger.info(pprint.pformat(args))
-    logger.info(config)
+    logger.info(configs)
 
     writer_dict = {
         'writer': SummaryWriter(tb_log_dir),
@@ -77,10 +77,10 @@ def main():
     }
 
     # cudnn related setting
-    cudnn.benchmark = config.CUDNN.BENCHMARK
-    cudnn.deterministic = config.CUDNN.DETERMINISTIC
-    cudnn.enabled = config.CUDNN.ENABLED
-    gpus = list(config.GPUS)
+    cudnn.benchmark = configs.CUDNN.BENCHMARK
+    cudnn.deterministic = configs.CUDNN.DETERMINISTIC
+    cudnn.enabled = configs.CUDNN.ENABLED
+    gpus = list(configs.GPUS)
     distributed = args.local_rank >= 0
     if distributed:
         device = torch.device('cuda:{}'.format(args.local_rank))
@@ -90,11 +90,11 @@ def main():
         )
 
         # build model
-    model = eval('models.' + config.MODEL.NAME +
+    model = eval('models.' + configs.MODEL.NAME +
                  '.get_seg_model')(config)
 
     # dump_input = torch.rand(
-    #     (1, 3, config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
+    #     (1, 3, configs.TRAIN.IMAGE_SIZE[1], configs.TRAIN.IMAGE_SIZE[0])
     # )
     # logger.info(get_model_summary(model.cuda(), dump_input.cuda()))
 
@@ -107,71 +107,71 @@ def main():
         # shutil.copytree(os.path.join(this_dir, '../lib/models'), models_dst_dir)
 
     if distributed:
-        batch_size = config.TRAIN.BATCH_SIZE_PER_GPU
+        batch_size = configs.TRAIN.BATCH_SIZE_PER_GPU
     else:
-        batch_size = config.TRAIN.BATCH_SIZE_PER_GPU * len(gpus)
+        batch_size = configs.TRAIN.BATCH_SIZE_PER_GPU * len(gpus)
 
     # prepare data
-    crop_size = (config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
-    train_dataset = eval('datasets.' + config.DATASET.DATASET)(
-        root=config.DATASET.ROOT,
-        list_path=config.DATASET.TRAIN_SET,
+    crop_size = (configs.TRAIN.IMAGE_SIZE[1], configs.TRAIN.IMAGE_SIZE[0])
+    train_dataset = eval('datasets.' + configs.DATASET.DATASET)(
+        root=configs.DATASET.ROOT,
+        list_path=configs.DATASET.TRAIN_SET,
         num_samples=None,
-        num_classes=config.DATASET.NUM_CLASSES,
-        multi_scale=config.TRAIN.MULTI_SCALE,
-        flip=config.TRAIN.FLIP,
-        ignore_label=config.TRAIN.IGNORE_LABEL,
-        base_size=config.TRAIN.BASE_SIZE,
+        num_classes=configs.DATASET.NUM_CLASSES,
+        multi_scale=configs.TRAIN.MULTI_SCALE,
+        flip=configs.TRAIN.FLIP,
+        ignore_label=configs.TRAIN.IGNORE_LABEL,
+        base_size=configs.TRAIN.BASE_SIZE,
         crop_size=crop_size,
-        downsample_rate=config.TRAIN.DOWNSAMPLERATE,
-        scale_factor=config.TRAIN.SCALE_FACTOR)
+        downsample_rate=configs.TRAIN.DOWNSAMPLERATE,
+        scale_factor=configs.TRAIN.SCALE_FACTOR)
 
     train_sampler = get_sampler(train_dataset)
     trainloader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=config.TRAIN.SHUFFLE and train_sampler is None,
-        num_workers=config.WORKERS,
+        shuffle=configs.TRAIN.SHUFFLE and train_sampler is None,
+        num_workers=configs.WORKERS,
         pin_memory=True,
         drop_last=True,
         sampler=train_sampler)
 
     extra_epoch_iters = 0
-    if config.DATASET.EXTRA_TRAIN_SET:
-        extra_train_dataset = eval('datasets.' + config.DATASET.DATASET)(
-            root=config.DATASET.ROOT,
-            list_path=config.DATASET.EXTRA_TRAIN_SET,
+    if configs.DATASET.EXTRA_TRAIN_SET:
+        extra_train_dataset = eval('datasets.' + configs.DATASET.DATASET)(
+            root=configs.DATASET.ROOT,
+            list_path=configs.DATASET.EXTRA_TRAIN_SET,
             num_samples=None,
-            num_classes=config.DATASET.NUM_CLASSES,
-            multi_scale=config.TRAIN.MULTI_SCALE,
-            flip=config.TRAIN.FLIP,
-            ignore_label=config.TRAIN.IGNORE_LABEL,
-            base_size=config.TRAIN.BASE_SIZE,
+            num_classes=configs.DATASET.NUM_CLASSES,
+            multi_scale=configs.TRAIN.MULTI_SCALE,
+            flip=configs.TRAIN.FLIP,
+            ignore_label=configs.TRAIN.IGNORE_LABEL,
+            base_size=configs.TRAIN.BASE_SIZE,
             crop_size=crop_size,
-            downsample_rate=config.TRAIN.DOWNSAMPLERATE,
-            scale_factor=config.TRAIN.SCALE_FACTOR)
+            downsample_rate=configs.TRAIN.DOWNSAMPLERATE,
+            scale_factor=configs.TRAIN.SCALE_FACTOR)
         extra_train_sampler = get_sampler(extra_train_dataset)
         extra_trainloader = torch.utils.data.DataLoader(
             extra_train_dataset,
             batch_size=batch_size,
-            shuffle=config.TRAIN.SHUFFLE and extra_train_sampler is None,
-            num_workers=config.WORKERS,
+            shuffle=configs.TRAIN.SHUFFLE and extra_train_sampler is None,
+            num_workers=configs.WORKERS,
             pin_memory=True,
             drop_last=True,
             sampler=extra_train_sampler)
         extra_epoch_iters = np.int(extra_train_dataset.__len__() /
-                                   config.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
+                                   configs.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
 
-    test_size = (config.TEST.IMAGE_SIZE[1], config.TEST.IMAGE_SIZE[0])
-    test_dataset = eval('datasets.' + config.DATASET.DATASET)(
-        root=config.DATASET.ROOT,
-        list_path=config.DATASET.TEST_SET,
-        num_samples=config.TEST.NUM_SAMPLES,
-        num_classes=config.DATASET.NUM_CLASSES,
+    test_size = (configs.TEST.IMAGE_SIZE[1], configs.TEST.IMAGE_SIZE[0])
+    test_dataset = eval('datasets.' + configs.DATASET.DATASET)(
+        root=configs.DATASET.ROOT,
+        list_path=configs.DATASET.TEST_SET,
+        num_samples=configs.TEST.NUM_SAMPLES,
+        num_classes=configs.DATASET.NUM_CLASSES,
         multi_scale=False,
         flip=False,
-        ignore_label=config.TRAIN.IGNORE_LABEL,
-        base_size=config.TEST.BASE_SIZE,
+        ignore_label=configs.TRAIN.IGNORE_LABEL,
+        base_size=configs.TEST.BASE_SIZE,
         crop_size=test_size,
         downsample_rate=1)
 
@@ -180,18 +180,18 @@ def main():
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=config.WORKERS,
+        num_workers=configs.WORKERS,
         pin_memory=True,
         sampler=test_sampler)
 
     # criterion
-    if config.LOSS.USE_OHEM:
-        criterion = OhemCrossEntropy(ignore_label=config.TRAIN.IGNORE_LABEL,
-                                     thres=config.LOSS.OHEMTHRES,
-                                     min_kept=config.LOSS.OHEMKEEP,
+    if configs.LOSS.USE_OHEM:
+        criterion = OhemCrossEntropy(ignore_label=configs.TRAIN.IGNORE_LABEL,
+                                     thres=configs.LOSS.OHEMTHRES,
+                                     min_kept=configs.LOSS.OHEMKEEP,
                                      weight=train_dataset.class_weights)
     else:
-        criterion = CrossEntropy(ignore_label=config.TRAIN.IGNORE_LABEL,
+        criterion = CrossEntropy(ignore_label=configs.TRAIN.IGNORE_LABEL,
                                  weight=train_dataset.class_weights)
 
     model = PhysicsFormer(model, criterion,num_classes=args.num_classes,iterations=args.inference,image_size=args.logits_shape)
@@ -207,40 +207,40 @@ def main():
         model = nn.DataParallel(model, device_ids=gpus).cuda()
 
     # optimizer
-    if config.TRAIN.OPTIMIZER == 'sgd':
+    if configs.TRAIN.OPTIMIZER == 'sgd':
 
         params_dict = dict(model.named_parameters())
-        if config.TRAIN.NONBACKBONE_KEYWORDS:
+        if configs.TRAIN.NONBACKBONE_KEYWORDS:
             bb_lr = []
             nbb_lr = []
             nbb_keys = set()
             for k, param in params_dict.items():
-                if any(part in k for part in config.TRAIN.NONBACKBONE_KEYWORDS):
+                if any(part in k for part in configs.TRAIN.NONBACKBONE_KEYWORDS):
                     nbb_lr.append(param)
                     nbb_keys.add(k)
                 else:
                     bb_lr.append(param)
             print(nbb_keys)
-            params = [{'params': bb_lr, 'lr': config.TRAIN.LR},
-                      {'params': nbb_lr, 'lr': config.TRAIN.LR * config.TRAIN.NONBACKBONE_MULT}]
+            params = [{'params': bb_lr, 'lr': configs.TRAIN.LR},
+                      {'params': nbb_lr, 'lr': configs.TRAIN.LR * configs.TRAIN.NONBACKBONE_MULT}]
         else:
-            params = [{'params': list(params_dict.values()), 'lr': config.TRAIN.LR}]
+            params = [{'params': list(params_dict.values()), 'lr': configs.TRAIN.LR}]
 
         optimizer = torch.optim.SGD(params,
-                                    lr=config.TRAIN.LR,
-                                    momentum=config.TRAIN.MOMENTUM,
-                                    weight_decay=config.TRAIN.WD,
-                                    nesterov=config.TRAIN.NESTEROV,
+                                    lr=configs.TRAIN.LR,
+                                    momentum=configs.TRAIN.MOMENTUM,
+                                    weight_decay=configs.TRAIN.WD,
+                                    nesterov=configs.TRAIN.NESTEROV,
                                     )
     else:
         raise ValueError('Only Support SGD optimizer')
 
     epoch_iters = np.int(train_dataset.__len__() /
-                         config.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
+                         configs.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
 
     best_mIoU = 0
     last_epoch = 0
-    if config.TRAIN.RESUME:
+    if configs.TRAIN.RESUME:
         model_state_file = os.path.join(final_output_dir,
                                         'checkpoint.pth.tar')
         if os.path.isfile(model_state_file):
@@ -258,30 +258,30 @@ def main():
             torch.distributed.barrier()
 
     start = timeit.default_timer()
-    end_epoch = config.TRAIN.END_EPOCH + config.TRAIN.EXTRA_EPOCH
-    num_iters = config.TRAIN.END_EPOCH * epoch_iters
-    extra_iters = config.TRAIN.EXTRA_EPOCH * extra_epoch_iters
+    end_epoch = configs.TRAIN.END_EPOCH + configs.TRAIN.EXTRA_EPOCH
+    num_iters = configs.TRAIN.END_EPOCH * epoch_iters
+    extra_iters = configs.TRAIN.EXTRA_EPOCH * extra_epoch_iters
 
     for epoch in range(last_epoch, end_epoch):
 
-        current_trainloader = extra_trainloader if epoch >= config.TRAIN.END_EPOCH else trainloader
+        current_trainloader = extra_trainloader if epoch >= configs.TRAIN.END_EPOCH else trainloader
         if current_trainloader.sampler is not None and hasattr(current_trainloader.sampler, 'set_epoch'):
             current_trainloader.sampler.set_epoch(epoch)
 
-        # valid_loss, mean_IoU, IoU_array = validate(config, 
+        # valid_loss, mean_IoU, IoU_array = validate(configs, 
         #             testloader, model, writer_dict)
 
-        if epoch >= config.TRAIN.END_EPOCH:
-            train(config, epoch - config.TRAIN.END_EPOCH,
-                  config.TRAIN.EXTRA_EPOCH, extra_epoch_iters,
-                  config.TRAIN.EXTRA_LR, extra_iters,
+        if epoch >= configs.TRAIN.END_EPOCH:
+            train(configs, epoch - configs.TRAIN.END_EPOCH,
+                  configs.TRAIN.EXTRA_EPOCH, extra_epoch_iters,
+                  configs.TRAIN.EXTRA_LR, extra_iters,
                   extra_trainloader, optimizer, model, writer_dict)
         else:
-            train(config, epoch, config.TRAIN.END_EPOCH,
-                  epoch_iters, config.TRAIN.LR, num_iters,
+            train(configs, epoch, configs.TRAIN.END_EPOCH,
+                  epoch_iters, configs.TRAIN.LR, num_iters,
                   trainloader, optimizer, model, writer_dict)
 
-        valid_loss, mean_IoU, IoU_array = validate(config,
+        valid_loss, mean_IoU, IoU_array = validate(configs,
                                                    testloader, model, writer_dict)
 
         if args.local_rank <= 0:

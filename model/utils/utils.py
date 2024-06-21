@@ -68,6 +68,8 @@ class PhysicsFormer(FullModel):
     def __init__(self,model, loss,num_classes, iterations=2, image_size=(1024, 1024), **kwargs):
 
         super(PhysicsFormer, self).__init__(model, loss)
+        self.open = []
+        self.dilate = []
         self.classes = num_classes
         self.relu = _get_relu('relu')
         self.maxpool_1 = _max_pool2D("maxpool_1")
@@ -144,6 +146,11 @@ class PhysicsFormer(FullModel):
 
         norm_opened = self.final_operation(final_concatenated)
         norm_dilated = self.final_operation(final_concatenated, mode='dilation')
+        if len(self.open)<=1:
+            self.open.append(norm_opened)
+
+        if len(self.dilate)<=1:
+            self.dilate.append(norm_dilated)
 
         final_norm = torch.abs(norm_opened - norm_dilated)
         final_loss = torch.add(final_norm,loss,alpha=1)
@@ -190,32 +197,60 @@ def create_logger(cfg, cfg_name, phase='train'):
     #root_output_dir = Path(cfg.OUTPUT_DIR)
     # set up logger
     if not os.path.exists(cfg.OUTPUT_DIR):
-        print('=> creating {}'.format(cfg.OUTPUT_DIR))
+        #print('=> creating {}'.format(cfg.OUTPUT_DIR))
         os.mkdir(cfg.OUTPUT_DIR)
 
     dataset = cfg.DATASET.DATASET
     model = cfg.MODEL.NAME
     cfg_name = os.path.basename(cfg_name).split('.')[0]
 
-    final_output_dir = cfg.OUTPUT_DIR+'/'+'/'+dataset+'/'+cfg_name
+    final_output_dir = cfg.OUTPUT_DIR+'/'+'/'+dataset+'/'+ cfg_name
 
-    print('=> creating {}'.format(final_output_dir))
-    os.makedirs(final_output_dir)
+
+    #print('=> creating {}'.format(final_output_dir))
+    try:
+
+        if not os.path.exists(cfg.OUTPUT_DIR+'/'+'/'+dataset):
+            os.mkdir(cfg.OUTPUT_DIR+'/'+'/'+dataset)
+        if not os.path.exists(cfg.OUTPUT_DIR+'/'+'/'+dataset+'/'+cfg_name):
+            os.mkdir(cfg.OUTPUT_DIR+'/'+'/'+dataset+'/'+cfg_name)
+
+    except FileExistsError:
+
+        logging.basicConfig(level=logging.ERROR,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        logger_out = logging.getLogger(__name__)
+        logger_out.error('final_output direcotry exists')
 
 
     time_str = time.strftime('%Y-%m-%d-%H-%M')
     log_file = '{}_{}_{}.log'.format(cfg_name, time_str, phase)
     final_log_file = final_output_dir+'/'+log_file
     head = '%(asctime)-15s %(message)s'
+
     logging.basicConfig(filename=str(final_log_file),
                         format=head)
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     console = logging.StreamHandler()
     logging.getLogger('').addHandler(console)
+
     tensorboard_log_dir = cfg.LOG_DIR+dataset+'/'+model+'/'+cfg_name+'_'+time_str
-    print('=> creating {}'.format(tensorboard_log_dir))
-    os.makedirs(tensorboard_log_dir)
+    #print('=> creating {}'.format(tensorboard_log_dir))
+    try:
+
+        if not os.path.exists(cfg.LOG_DIR+'/'+dataset):
+            os.mkdir(cfg.LOG_DIR+'/'+dataset)
+        if not os.path.exists(cfg.LOG_DIR+'/'+dataset+'/'+model):
+            os.mkdir(cfg.LOG_DIR+'/'+dataset+'/'+model)
+        if not os.path.exists(cfg.LOG_DIR+'/'+dataset+'/'+model+'/'+cfg_name+'_'+time_str):
+            os.mkdir(cfg.LOG_DIR+'/'+dataset+'/'+model+'/'+cfg_name+'_'+time_str)
+
+    except FileExistsError:
+        logging.basicConfig(level=logging.ERROR,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        logger_log = logging.getLogger(__name__)
+        logger_log.error('final_log direcotry exists')
 
     return logger, str(final_output_dir), str(tensorboard_log_dir)
 
